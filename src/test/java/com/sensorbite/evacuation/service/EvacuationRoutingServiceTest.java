@@ -2,12 +2,17 @@
 package com.sensorbite.evacuation.service;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 
+import com.sensorbite.evacuation.config.EvacuationProperties;
 import com.sensorbite.evacuation.domain.HazardZone;
 import com.sensorbite.evacuation.domain.RoadNode;
 import com.sensorbite.evacuation.domain.RouteResult;
 import com.sensorbite.evacuation.exception.NoRouteFoundException;
+import com.sensorbite.evacuation.service.RoadNetworkService.RoadNetworkCacheEntry;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -18,7 +23,6 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.locationtech.jts.geom.*;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -26,16 +30,24 @@ import org.mockito.junit.jupiter.MockitoExtension;
 class EvacuationRoutingServiceTest {
 
   @Mock private RoadNetworkService roadNetworkService;
+  @Mock private RoadNetworkCacheEntry mockCacheEntry;
 
-  @InjectMocks private EvacuationRoutingService routingService;
+  private EvacuationRoutingService routingService;
 
   private GeometryFactory geometryFactory;
   private Graph<RoadNode, DefaultWeightedEdge> testGraph;
+  private static final String TEST_NETWORK = "test-network";
 
   @BeforeEach
   void setUp() {
     geometryFactory = new GeometryFactory();
     testGraph = createTestGraph();
+    EvacuationProperties properties = new EvacuationProperties(); // Use default properties for tests
+    routingService = new EvacuationRoutingService(roadNetworkService, properties);
+
+    // Mock the cache entry to provide the test graph
+    when(roadNetworkService.getRoadNetworkCacheEntry(anyString())).thenReturn(mockCacheEntry);
+    when(mockCacheEntry.getGraph()).thenReturn(testGraph);
   }
 
   @Test
@@ -48,11 +60,13 @@ class EvacuationRoutingServiceTest {
     RoadNode startNode = new RoadNode("node_0_0", start);
     RoadNode endNode = new RoadNode("node_2_0", end);
 
-    when(roadNetworkService.findNearestNode(start, testGraph)).thenReturn(startNode);
-    when(roadNetworkService.findNearestNode(end, testGraph)).thenReturn(endNode);
+    when(roadNetworkService.findNearestNode(eq(start), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(startNode);
+    when(roadNetworkService.findNearestNode(eq(end), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(endNode);
 
     // Act
-    RouteResult result = routingService.findSafestRoute(start, end, testGraph, hazards);
+    RouteResult result = routingService.findSafestRoute(start, end, TEST_NETWORK, hazards);
 
     // Assert
     assertNotNull(result);
@@ -68,16 +82,11 @@ class EvacuationRoutingServiceTest {
     Point start = geometryFactory.createPoint(new Coordinate(0, 0));
     Point end = geometryFactory.createPoint(new Coordinate(2, 0));
 
-    // Create hazard zone in the middle
     Coordinate[] hazardCoords = {
-      new Coordinate(0.8, -0.2),
-      new Coordinate(1.2, -0.2),
-      new Coordinate(1.2, 0.2),
-      new Coordinate(0.8, 0.2),
-      new Coordinate(0.8, -0.2)
+      new Coordinate(0.8, -0.2), new Coordinate(1.2, -0.2), new Coordinate(1.2, 0.2),
+      new Coordinate(0.8, 0.2), new Coordinate(0.8, -0.2)
     };
     Polygon hazardPolygon = geometryFactory.createPolygon(hazardCoords);
-
     HazardZone hazard =
         HazardZone.builder()
             .id("hazard_1")
@@ -85,17 +94,18 @@ class EvacuationRoutingServiceTest {
             .hazardType("flood")
             .severity(4)
             .build();
-
     List<HazardZone> hazards = List.of(hazard);
 
     RoadNode startNode = new RoadNode("node_0_0", start);
     RoadNode endNode = new RoadNode("node_2_0", end);
 
-    when(roadNetworkService.findNearestNode(start, testGraph)).thenReturn(startNode);
-    when(roadNetworkService.findNearestNode(end, testGraph)).thenReturn(endNode);
+    when(roadNetworkService.findNearestNode(eq(start), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(startNode);
+    when(roadNetworkService.findNearestNode(eq(end), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(endNode);
 
     // Act
-    RouteResult result = routingService.findSafestRoute(start, end, testGraph, hazards);
+    RouteResult result = routingService.findSafestRoute(start, end, TEST_NETWORK, hazards);
 
     // Assert
     assertNotNull(result);
@@ -108,26 +118,25 @@ class EvacuationRoutingServiceTest {
     // Arrange
     Graph<RoadNode, DefaultWeightedEdge> disconnectedGraph =
         new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
-
     Point start = geometryFactory.createPoint(new Coordinate(0, 0));
     Point end = geometryFactory.createPoint(new Coordinate(10, 10));
-
     RoadNode startNode = new RoadNode("node_0_0", start);
     RoadNode endNode = new RoadNode("node_10_10", end);
-
     disconnectedGraph.addVertex(startNode);
     disconnectedGraph.addVertex(endNode);
-    // No edges - disconnected graph
 
-    when(roadNetworkService.findNearestNode(start, disconnectedGraph)).thenReturn(startNode);
-    when(roadNetworkService.findNearestNode(end, disconnectedGraph)).thenReturn(endNode);
+    // Make the cache entry return the disconnected graph
+    when(mockCacheEntry.getGraph()).thenReturn(disconnectedGraph);
+
+    when(roadNetworkService.findNearestNode(eq(start), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(startNode);
+    when(roadNetworkService.findNearestNode(eq(end), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(endNode);
 
     // Act & Assert
     assertThrows(
         NoRouteFoundException.class,
-        () -> {
-          routingService.findSafestRoute(start, end, disconnectedGraph, Collections.emptyList());
-        });
+        () -> routingService.findSafestRoute(start, end, TEST_NETWORK, Collections.emptyList()));
   }
 
   @Test
@@ -136,16 +145,15 @@ class EvacuationRoutingServiceTest {
     Point start = geometryFactory.createPoint(new Coordinate(0, 0));
     Point end = geometryFactory.createPoint(new Coordinate(2, 0));
 
-    when(roadNetworkService.findNearestNode(start, testGraph)).thenReturn(null);
-    when(roadNetworkService.findNearestNode(end, testGraph))
+    when(roadNetworkService.findNearestNode(eq(start), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(null);
+    when(roadNetworkService.findNearestNode(eq(end), any(RoadNetworkCacheEntry.class)))
         .thenReturn(new RoadNode("node_2_0", end));
 
     // Act & Assert
     assertThrows(
         NoRouteFoundException.class,
-        () -> {
-          routingService.findSafestRoute(start, end, testGraph, Collections.emptyList());
-        });
+        () -> routingService.findSafestRoute(start, end, TEST_NETWORK, Collections.emptyList()));
   }
 
   @Test
@@ -155,22 +163,15 @@ class EvacuationRoutingServiceTest {
     Point end = geometryFactory.createPoint(new Coordinate(2, 0));
 
     List<HazardZone> hazards = new ArrayList<>();
-
-    // Add multiple hazard zones
     for (int i = 0; i < 3; i++) {
       Coordinate[] coords = {
-        new Coordinate(3 + i, -1),
-        new Coordinate(4 + i, -1),
-        new Coordinate(4 + i, 1),
-        new Coordinate(3 + i, 1),
-        new Coordinate(3 + i, -1)
+        new Coordinate(3 + i, -1), new Coordinate(4 + i, -1), new Coordinate(4 + i, 1),
+        new Coordinate(3 + i, 1), new Coordinate(3 + i, -1)
       };
-      Polygon polygon = geometryFactory.createPolygon(coords);
-
       hazards.add(
           HazardZone.builder()
               .id("hazard_" + i)
-              .geometry(polygon)
+              .geometry(geometryFactory.createPolygon(coords))
               .hazardType("flood")
               .severity(3)
               .build());
@@ -179,11 +180,13 @@ class EvacuationRoutingServiceTest {
     RoadNode startNode = new RoadNode("node_0_0", start);
     RoadNode endNode = new RoadNode("node_2_0", end);
 
-    when(roadNetworkService.findNearestNode(start, testGraph)).thenReturn(startNode);
-    when(roadNetworkService.findNearestNode(end, testGraph)).thenReturn(endNode);
+    when(roadNetworkService.findNearestNode(eq(start), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(startNode);
+    when(roadNetworkService.findNearestNode(eq(end), any(RoadNetworkCacheEntry.class)))
+        .thenReturn(endNode);
 
     // Act
-    RouteResult result = routingService.findSafestRoute(start, end, testGraph, hazards);
+    RouteResult result = routingService.findSafestRoute(start, end, TEST_NETWORK, hazards);
 
     // Assert
     assertNotNull(result);
@@ -196,9 +199,7 @@ class EvacuationRoutingServiceTest {
     Graph<RoadNode, DefaultWeightedEdge> graph =
         new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
 
-    // Create 3x3 grid
     RoadNode[][] nodes = new RoadNode[3][3];
-
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
         Point point = geometryFactory.createPoint(new Coordinate(i, j));
@@ -207,22 +208,18 @@ class EvacuationRoutingServiceTest {
       }
     }
 
-    // Connect nodes
     for (int i = 0; i < 3; i++) {
       for (int j = 0; j < 3; j++) {
-        // Horizontal
         if (i < 2) {
           DefaultWeightedEdge edge = graph.addEdge(nodes[i][j], nodes[i + 1][j]);
           if (edge != null) graph.setEdgeWeight(edge, 1.0);
         }
-        // Vertical
         if (j < 2) {
           DefaultWeightedEdge edge = graph.addEdge(nodes[i][j], nodes[i][j + 1]);
           if (edge != null) graph.setEdgeWeight(edge, 1.0);
         }
       }
     }
-
     return graph;
   }
 }

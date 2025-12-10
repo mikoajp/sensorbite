@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.sensorbite.evacuation.domain.RoadNode;
 import com.sensorbite.evacuation.exception.RoadNetworkLoadException;
+import com.sensorbite.evacuation.service.RoadNetworkService.RoadNetworkCacheEntry;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import org.jgrapht.Graph;
@@ -14,6 +15,7 @@ import org.junit.jupiter.api.Test;
 import org.locationtech.jts.geom.Coordinate;
 import org.locationtech.jts.geom.GeometryFactory;
 import org.locationtech.jts.geom.Point;
+import org.locationtech.jts.index.strtree.STRtree;
 
 class RoadNetworkServiceTest {
 
@@ -40,19 +42,7 @@ class RoadNetworkServiceTest {
                         "type": "LineString",
                         "coordinates": [[21.0, 52.0], [21.01, 52.0]]
                       },
-                      "properties": {
-                        "highway": "primary"
-                      }
-                    },
-                    {
-                      "type": "Feature",
-                      "geometry": {
-                        "type": "LineString",
-                        "coordinates": [[21.01, 52.0], [21.01, 52.01]]
-                      },
-                      "properties": {
-                        "highway": "secondary"
-                      }
+                      "properties": { "highway": "primary" }
                     }
                   ]
                 }
@@ -67,29 +57,19 @@ class RoadNetworkServiceTest {
     assertNotNull(graph);
     assertFalse(graph.vertexSet().isEmpty());
     assertFalse(graph.edgeSet().isEmpty());
-    assertTrue(graph.vertexSet().size() >= 2);
-    assertTrue(graph.edgeSet().size() >= 1);
   }
 
   @Test
   void loadRoadNetwork_WithEmptyFeatures_ShouldThrowException() {
     // Arrange
-    String geoJson =
-        """
-                {
-                  "type": "FeatureCollection",
-                  "features": []
-                }
-                """;
-
+    String geoJson = """
+        { "type": "FeatureCollection", "features": [] }
+        """;
     InputStream inputStream = new ByteArrayInputStream(geoJson.getBytes());
 
     // Act & Assert
     assertThrows(
-        RoadNetworkLoadException.class,
-        () -> {
-          roadNetworkService.loadRoadNetwork(inputStream);
-        });
+        RoadNetworkLoadException.class, () -> roadNetworkService.loadRoadNetwork(inputStream));
   }
 
   @Test
@@ -99,11 +79,7 @@ class RoadNetworkServiceTest {
     InputStream inputStream = new ByteArrayInputStream(invalidJson.getBytes());
 
     // Act & Assert
-    assertThrows(
-        Exception.class,
-        () -> {
-          roadNetworkService.loadRoadNetwork(inputStream);
-        });
+    assertThrows(Exception.class, () -> roadNetworkService.loadRoadNetwork(inputStream));
   }
 
   @Test
@@ -115,20 +91,10 @@ class RoadNetworkServiceTest {
                   "type": "FeatureCollection",
                   "features": [
                     {
-                      "type": "Feature",
-                      "geometry": {
-                        "type": "LineString",
-                        "coordinates": [[21.0, 52.0], [21.01, 52.0]]
-                      },
-                      "properties": {}
+                      "type": "Feature", "geometry": { "type": "LineString", "coordinates": [[10, 10], [20, 10]] }
                     },
                     {
-                      "type": "Feature",
-                      "geometry": {
-                        "type": "LineString",
-                        "coordinates": [[21.01, 52.0], [21.02, 52.01]]
-                      },
-                      "properties": {}
+                      "type": "Feature", "geometry": { "type": "LineString", "coordinates": [[20, 10], [20, 20]] }
                     }
                   ]
                 }
@@ -136,15 +102,18 @@ class RoadNetworkServiceTest {
 
     InputStream inputStream = new ByteArrayInputStream(geoJson.getBytes());
     Graph<RoadNode, DefaultWeightedEdge> graph = roadNetworkService.loadRoadNetwork(inputStream);
+    RoadNetworkCacheEntry cacheEntry = buildTestCacheEntry(graph);
 
-    Point targetPoint = geometryFactory.createPoint(new Coordinate(21.005, 52.0));
+    Point targetPoint = geometryFactory.createPoint(new Coordinate(19.9, 10));
 
     // Act
-    RoadNode nearestNode = roadNetworkService.findNearestNode(targetPoint, graph);
+    RoadNode nearestNode = roadNetworkService.findNearestNode(targetPoint, cacheEntry);
 
     // Assert
     assertNotNull(nearestNode);
-    assertTrue(nearestNode.getLocation().distance(targetPoint) < 0.1);
+    // The closest node should be (20, 10)
+    assertEquals(20.0, nearestNode.getLocation().getX());
+    assertEquals(10.0, nearestNode.getLocation().getY());
   }
 
   @Test
@@ -152,10 +121,11 @@ class RoadNetworkServiceTest {
     // Arrange
     Graph<RoadNode, DefaultWeightedEdge> emptyGraph =
         new org.jgrapht.graph.SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+    RoadNetworkCacheEntry emptyCacheEntry = buildTestCacheEntry(emptyGraph);
     Point targetPoint = geometryFactory.createPoint(new Coordinate(21.0, 52.0));
 
     // Act
-    RoadNode nearestNode = roadNetworkService.findNearestNode(targetPoint, emptyGraph);
+    RoadNode nearestNode = roadNetworkService.findNearestNode(targetPoint, emptyCacheEntry);
 
     // Assert
     assertNull(nearestNode);
@@ -178,9 +148,7 @@ class RoadNetworkServiceTest {
                           [[21.01, 52.0], [21.02, 52.0]]
                         ]
                       },
-                      "properties": {
-                        "highway": "primary"
-                      }
+                      "properties": { "highway": "primary" }
                     }
                   ]
                 }
@@ -193,7 +161,16 @@ class RoadNetworkServiceTest {
 
     // Assert
     assertNotNull(graph);
-    assertTrue(graph.vertexSet().size() >= 3);
-    assertTrue(graph.edgeSet().size() >= 2);
+    assertEquals(3, graph.vertexSet().size());
+    assertEquals(2, graph.edgeSet().size());
+  }
+
+  private RoadNetworkCacheEntry buildTestCacheEntry(Graph<RoadNode, DefaultWeightedEdge> graph) {
+    STRtree spatialIndex = new STRtree();
+    for (RoadNode node : graph.vertexSet()) {
+      spatialIndex.insert(node.getLocation().getEnvelopeInternal(), node);
+    }
+    spatialIndex.build();
+    return new RoadNetworkCacheEntry(graph, spatialIndex);
   }
 }

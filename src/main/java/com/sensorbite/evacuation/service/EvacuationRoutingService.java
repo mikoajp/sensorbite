@@ -1,6 +1,7 @@
 /* Copyright (c) 2024 Sensorbite. All rights reserved. */
 package com.sensorbite.evacuation.service;
 
+import com.sensorbite.evacuation.config.EvacuationProperties;
 import com.sensorbite.evacuation.domain.HazardZone;
 import com.sensorbite.evacuation.domain.RoadNode;
 import com.sensorbite.evacuation.domain.RouteResult;
@@ -27,41 +28,41 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class EvacuationRoutingService {
 
-  private static final double HAZARD_PENALTY_MULTIPLIER = 100.0;
-  private static final double WALKING_SPEED_KMH = 5.0;
-  private static final double SEVERE_HAZARD_MULTIPLIER = 1000.0;
-
   private final RoadNetworkService roadNetworkService;
+  private final EvacuationProperties properties;
 
   /**
    * Finds the safest evacuation route between two points, avoiding hazard zones.
    *
    * @param start Starting point
    * @param end Ending point
-   * @param roadNetwork The road network graph
+   * @param networkName The name of the road network to use
    * @param hazardZones List of hazard zones to avoid
    * @return RouteResult containing the calculated route and metrics
    * @throws NoRouteFoundException if no valid route can be found
    */
   public RouteResult findSafestRoute(
-      Point start,
-      Point end,
-      Graph<RoadNode, DefaultWeightedEdge> roadNetwork,
-      List<HazardZone> hazardZones) {
+      Point start, Point end, String networkName, List<HazardZone> hazardZones) {
 
     log.info(
-        "Calculating evacuation route from [{}, {}] to [{}, {}]",
+        "Calculating evacuation route from [{}, {}] to [{}, {}] using network '{}'",
         start.getX(),
         start.getY(),
         end.getX(),
-        end.getY());
+        end.getY(),
+        networkName);
 
     long startTime = System.currentTimeMillis();
 
     try {
-      // 1. Find nearest nodes to start/end points
-      RoadNode startNode = roadNetworkService.findNearestNode(start, roadNetwork);
-      RoadNode endNode = roadNetworkService.findNearestNode(end, roadNetwork);
+      // 1. Get the cached road network and spatial index
+      RoadNetworkService.RoadNetworkCacheEntry network =
+          roadNetworkService.getRoadNetworkCacheEntry(networkName);
+      Graph<RoadNode, DefaultWeightedEdge> roadNetwork = network.getGraph();
+
+      // 2. Find nearest nodes to start/end points using the spatial index
+      RoadNode startNode = roadNetworkService.findNearestNode(start, network);
+      RoadNode endNode = roadNetworkService.findNearestNode(end, network);
 
       if (startNode == null || endNode == null) {
         throw new NoRouteFoundException("Could not find nodes near start or end points");
@@ -73,11 +74,11 @@ public class EvacuationRoutingService {
       checkPointSafety(start, hazardZones, "start");
       checkPointSafety(end, hazardZones, "end");
 
-      // 2. Create weighted graph with hazard penalties
+      // 3. Create weighted graph with hazard penalties
       Graph<RoadNode, DefaultWeightedEdge> weightedGraph =
           createWeightedGraph(roadNetwork, hazardZones);
 
-      // 3. Run Dijkstra algorithm
+      // 4. Run Dijkstra algorithm
       DijkstraShortestPath<RoadNode, DefaultWeightedEdge> dijkstra =
           new DijkstraShortestPath<>(weightedGraph);
 
@@ -89,7 +90,7 @@ public class EvacuationRoutingService {
             "No safe route found between given points. All possible paths may be blocked.");
       }
 
-      // 4. Build result with metrics
+      // 5. Build result with metrics
       long calculationTime = System.currentTimeMillis() - startTime;
       RouteResult result = buildRouteResult(path, hazardZones, calculationTime);
 
@@ -161,13 +162,17 @@ public class EvacuationRoutingService {
     double penalty = 1.0;
     int intersectingZones = 0;
 
+    EvacuationProperties.Penalty penaltyProps = properties.getPenalty();
+
     for (HazardZone zone : hazardZones) {
       if (zone.getGeometry().intersects(segment)) {
         intersectingZones++;
 
         // Apply penalty based on severity
         double severityMultiplier =
-            zone.getSeverity() >= 4 ? SEVERE_HAZARD_MULTIPLIER : HAZARD_PENALTY_MULTIPLIER;
+            zone.getSeverity() >= penaltyProps.getSevereHazardThreshold()
+                ? penaltyProps.getSevereHazardMultiplier()
+                : penaltyProps.getHazardMultiplier();
 
         penalty *= severityMultiplier;
 
@@ -202,11 +207,15 @@ public class EvacuationRoutingService {
     // Build route geometry
     LineString routeGeometry = createRouteGeometry(nodes);
 
-    // Calculate actual distance (sum of segment lengths)
-    double totalDistance = calculateActualDistance(nodes);
+    // The path weight is now the sum of accurate distances in meters.
+    double totalDistance = path.getWeight();
 
     // Calculate estimated time
-    long estimatedTimeMinutes = (long) ((totalDistance / 1000.0) / WALKING_SPEED_KMH * 60);
+    long estimatedTimeMinutes =
+        (long)
+            ((totalDistance / 1000.0)
+                / properties.getRouteCalculation().getWalkingSpeedKmh()
+                * 60);
 
     // Count avoided hazards
     int avoidedZones = countAvoidedHazards(routeGeometry, hazardZones);
@@ -243,23 +252,7 @@ public class EvacuationRoutingService {
     return factory.createLineString(coords);
   }
 
-  /** Calculates actual distance by summing segment lengths. */
-  private double calculateActualDistance(List<RoadNode> nodes) {
-    double totalDistance = 0.0;
-
-    for (int i = 0; i < nodes.size() - 1; i++) {
-      RoadNode current = nodes.get(i);
-      RoadNode next = nodes.get(i + 1);
-
-      double distance =
-          current.getLocation().distance(next.getLocation()) * 111320; // Convert to meters
-      totalDistance += distance;
-    }
-
-    return totalDistance;
-  }
-
-  /** Counts how many hazard zones would have been encountered on a direct path. */
+  /** Counts how many hazard zones would have been encountered on a a direct path. */
   private int countAvoidedHazards(LineString route, List<HazardZone> hazardZones) {
     int count = 0;
 
@@ -282,28 +275,28 @@ public class EvacuationRoutingService {
       return 100.0;
     }
 
+    EvacuationProperties.SafetyScore scoreProps = properties.getSafetyScore();
     double minDistance = Double.MAX_VALUE;
-    boolean intersectsAny = false;
 
     for (HazardZone zone : hazardZones) {
       if (route.intersects(zone.getGeometry())) {
-        intersectsAny = true;
         // Severe penalty for intersection
-        return Math.max(0, 30.0 - (zone.getSeverity() * 5.0));
+        return Math.max(
+            0,
+            scoreProps.getIntersectionBaseScore()
+                - (zone.getSeverity() * scoreProps.getIntersectionSeverityMultiplier()));
       }
 
       double distance = route.distance(zone.getGeometry());
       minDistance = Math.min(minDistance, distance);
     }
 
-    if (intersectsAny) {
-      return 0.0;
-    }
-
     // Score based on minimum distance to any hazard
     // Distance in degrees, normalize to 0-100 scale
-    double normalizedDistance = Math.min(minDistance * 10000, 1.0); // 0-1 range
-    return 50.0 + (normalizedDistance * 50.0); // 50-100 range
+    double normalizedDistance =
+        Math.min(minDistance * scoreProps.getDistanceNormalizationFactor(), 1.0); // 0-1 range
+    return scoreProps.getNonIntersectionBaseScore()
+        + (normalizedDistance * scoreProps.getNonIntersectionDistanceBonus()); // 50-100 range
   }
 
   /** Builds list of waypoint coordinates from nodes. */
@@ -320,10 +313,11 @@ public class EvacuationRoutingService {
   /** Generates human-readable notes about the route. */
   private String generateRouteNotes(int avoidedZones, double safetyScore, double distance) {
     StringBuilder notes = new StringBuilder();
+    EvacuationProperties.SafetyScore scoreProps = properties.getSafetyScore();
 
-    if (safetyScore >= 80) {
+    if (safetyScore >= scoreProps.getHighSafetyThreshold()) {
       notes.append("This is a safe evacuation route. ");
-    } else if (safetyScore >= 50) {
+    } else if (safetyScore >= scoreProps.getMediumSafetyThreshold()) {
       notes.append("This route has moderate safety. Exercise caution. ");
     } else {
       notes.append("WARNING: This route passes near hazard zones. Use extreme caution. ");
@@ -333,7 +327,7 @@ public class EvacuationRoutingService {
       notes.append(String.format("Successfully avoiding %d hazard zone(s). ", avoidedZones));
     }
 
-    if (distance > 5000) {
+    if (distance > properties.getNotes().getLongRouteThresholdMeters()) {
       notes.append("This is a long route. Consider alternative transportation if available.");
     }
 

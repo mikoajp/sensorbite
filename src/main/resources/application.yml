@@ -7,7 +7,7 @@ sentinel-hub:
   timeout-seconds: 30
   max-retries: 3
   enabled: false
-  mock-mode: true  # Use mock data by default
+  mock-mode: true # Use mock data by default
   cache-ttl-minutes: 60
 
 # Management and Actuator
@@ -41,7 +41,7 @@ resilience4j:
         wait-duration-in-open-state: 60000
         permitted-number-of-calls-in-half-open-state: 3
         sliding-window-size: 10
-        
+
   retry:
     instances:
       sentinelHub:
@@ -49,3 +49,24 @@ resilience4j:
         wait-duration: 1000
         enable-exponential-backoff: true
         exponential-backoff-multiplier: 2
+
+# Sensorbite Application Specific Configuration
+sensorbite:
+  evacuation:
+    route-calculation:
+      degrees-to-meters-factor: 111320.0
+      walking-speed-kmh: 5.0
+    penalty:
+      severe-hazard-threshold: 4
+      hazard-multiplier: 100.0
+      severe-hazard-multiplier: 1000.0
+    safety-score:
+      high-safety-threshold: 80.0
+      medium-safety-threshold: 50.0
+      intersection-base-score: 30.0
+      intersection-severity-multiplier: 5.0
+      distance-normalization-factor: 10000.0
+      non-intersection-base-score: 50.0
+      non-intersection-distance-bonus: 50.0
+    notes:
+      long-route-threshold-meters: 5000.0
