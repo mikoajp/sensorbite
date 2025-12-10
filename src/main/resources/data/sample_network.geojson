@@ -1,0 +1,170 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.0, 52.0], [21.01, 52.0]]
+      },
+      "properties": {
+        "highway": "primary",
+        "name": "Main Street East"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.01, 52.0], [21.02, 52.0]]
+      },
+      "properties": {
+        "highway": "primary",
+        "name": "Main Street East"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.02, 52.0], [21.03, 52.0]]
+      },
+      "properties": {
+        "highway": "primary",
+        "name": "Main Street East"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.0, 52.0], [21.0, 52.01]]
+      },
+      "properties": {
+        "highway": "secondary",
+        "name": "North Avenue"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.0, 52.01], [21.0, 52.02]]
+      },
+      "properties": {
+        "highway": "secondary",
+        "name": "North Avenue"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.0, 52.02], [21.0, 52.03]]
+      },
+      "properties": {
+        "highway": "secondary",
+        "name": "North Avenue"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.01, 52.0], [21.01, 52.01]]
+      },
+      "properties": {
+        "highway": "residential",
+        "name": "Park Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.01, 52.01], [21.01, 52.02]]
+      },
+      "properties": {
+        "highway": "residential",
+        "name": "Park Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.02, 52.0], [21.02, 52.01]]
+      },
+      "properties": {
+        "highway": "residential",
+        "name": "Church Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.02, 52.01], [21.02, 52.02]]
+      },
+      "properties": {
+        "highway": "residential",
+        "name": "Church Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.0, 52.01], [21.01, 52.01]]
+      },
+      "properties": {
+        "highway": "secondary",
+        "name": "Cross Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.01, 52.01], [21.02, 52.01]]
+      },
+      "properties": {
+        "highway": "secondary",
+        "name": "Cross Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.02, 52.01], [21.03, 52.01]]
+      },
+      "properties": {
+        "highway": "secondary",
+        "name": "Cross Street"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.0, 52.02], [21.01, 52.02]]
+      },
+      "properties": {
+        "highway": "tertiary",
+        "name": "River Road"
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [[21.01, 52.02], [21.02, 52.02]]
+      },
+      "properties": {
+        "highway": "tertiary",
+        "name": "River Road"
+      }
+    }
+  ]
+}

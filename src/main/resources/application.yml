@@ -1,0 +1,51 @@
+# Sentinel Hub Configuration
+sentinel-hub:
+  base-url: https://services.sentinel-hub.com
+  token-url: https://services.sentinel-hub.com/oauth/token
+  client-id: ${SENTINEL_HUB_CLIENT_ID:}
+  client-secret: ${SENTINEL_HUB_CLIENT_SECRET:}
+  timeout-seconds: 30
+  max-retries: 3
+  enabled: false
+  mock-mode: true  # Use mock data by default
+  cache-ttl-minutes: 60
+
+# Management and Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,prometheus,loggers
+      base-path: /actuator
+  endpoint:
+    health:
+      show-details: when-authorized
+    metrics:
+      enabled: true
+    prometheus:
+      enabled: true
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+    tags:
+      application: sensorbite
+      environment: ${spring.profiles.active:dev}
+
+# Resilience4j Configuration
+resilience4j:
+  circuitbreaker:
+    instances:
+      sentinelHub:
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 60000
+        permitted-number-of-calls-in-half-open-state: 3
+        sliding-window-size: 10
+        
+  retry:
+    instances:
+      sentinelHub:
+        max-attempts: 3
+        wait-duration: 1000
+        enable-exponential-backoff: true
+        exponential-backoff-multiplier: 2

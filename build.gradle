@@ -1,0 +1,231 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version '3.2.0'
+    id 'io.spring.dependency-management' version '1.1.4'
+    id 'jacoco'
+    id 'com.diffplug.spotless' version '6.23.3'
+    id 'pmd'
+    id 'com.github.spotbugs' version '6.0.4'
+    id 'checkstyle'
+    id 'com.github.ben-manes.versions' version '0.50.0'
+}
+
+group = 'com.sensorbite'
+version = '0.0.1-SNAPSHOT'
+
+java {
+    sourceCompatibility = '17'
+}
+
+configurations {
+    compileOnly {
+        extendsFrom annotationProcessor
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://repo.osgeo.org/repository/release/"
+    }
+    maven {
+        url "https://repo.osgeo.org/repository/snapshot/"
+    }
+    maven {
+        url "https://repo.locationtech.org/content/repositories/releases/"
+    }
+}
+
+dependencies {
+    // Spring Boot Starters
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+    implementation 'org.springframework.boot:spring-boot-starter-webflux'
+
+    // Database
+    runtimeOnly 'com.h2database:h2'
+
+    // Swagger/OpenAPI
+    implementation 'org.springdoc:springdoc-openapi-starter-webmvc-ui:2.3.0'
+
+    // GIS Libraries
+    implementation 'org.locationtech.jts:jts-core:1.19.0'
+    implementation('org.geotools:gt-geojson:29.2') {
+        exclude group: 'javax.media', module: 'jai_core'
+        exclude group: 'javax.media', module: 'jai_codec'
+        exclude group: 'javax.media', module: 'jai_imageio'
+    }
+    implementation('org.geotools:gt-epsg-hsql:29.2') {
+        exclude group: 'javax.media', module: 'jai_core'
+        exclude group: 'javax.media', module: 'jai_codec'
+    }
+    implementation('org.geotools:gt-referencing:29.2') {
+        exclude group: 'javax.media', module: 'jai_core'
+    }
+
+    // Graph algorithms
+    implementation 'org.jgrapht:jgrapht-core:1.5.2'
+
+    // JSON processing
+    implementation 'org.json:json:20231013'
+
+    // Caching
+    implementation 'com.github.ben-manes.caffeine:caffeine:3.1.8'
+    implementation 'org.springframework.boot:spring-boot-starter-cache'
+
+    // Utilities
+    implementation 'org.apache.commons:commons-lang3'
+    implementation 'com.google.guava:guava:32.1.3-jre'
+
+    // Resilience4j for circuit breaker
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.1.0'
+    implementation 'io.github.resilience4j:resilience4j-circuitbreaker:2.1.0'
+    implementation 'io.github.resilience4j:resilience4j-retry:2.1.0'
+
+    // AOP for logging aspect
+    implementation 'org.springframework.boot:spring-boot-starter-aop'
+
+    // Micrometer for metrics
+    implementation 'io.micrometer:micrometer-registry-prometheus'
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Testing
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'io.rest-assured:rest-assured:5.4.0'
+    testImplementation 'com.github.tomakehurst:wiremock-jre8:2.35.0'
+
+    // Development tools
+    developmentOnly 'org.springframework.boot:spring-boot-devtools'
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = "0.8.11"
+}
+
+jacocoTestReport {
+    dependsOn test
+    reports {
+        xml.required = true
+        html.required = true
+    }
+
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                '**/config/**',
+                '**/dto/**',
+                '**/entity/**',
+                '**/*Application.class'
+            ])
+        }))
+    }
+}
+
+jacocoTestCoverageVerification {
+    violationRules {
+        rule {
+            limit {
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+// Spotless - Code formatting
+spotless {
+    java {
+        target 'src/**/*.java'
+        googleJavaFormat('1.18.1')
+        removeUnusedImports()
+        trimTrailingWhitespace()
+        endWithNewline()
+
+        // Custom formatting
+        indentWithSpaces(4)
+
+        // License header (optional)
+        licenseHeader '/* Copyright (c) 2024 Sensorbite. All rights reserved. */'
+    }
+
+    format 'misc', {
+        target '*.gradle', '*.md', '.gitignore'
+        trimTrailingWhitespace()
+        indentWithSpaces(2)
+        endWithNewline()
+    }
+}
+
+// PMD - Static analysis
+pmd {
+    toolVersion = '7.0.0'
+    consoleOutput = true
+    ruleSetFiles = files("config/pmd/ruleset.xml")
+    ruleSets = []
+    ignoreFailures = true
+}
+
+tasks.withType(Pmd) {
+    reports {
+        xml.required = true
+        html.required = true
+    }
+}
+
+// SpotBugs - Bug detection
+spotbugs {
+    ignoreFailures = true
+    excludeFilter = file("config/spotbugs/exclude.xml")
+}
+
+tasks.withType(com.github.spotbugs.snom.SpotBugsTask) {
+    reports {
+        xml {
+            required = false
+        }
+        html {
+            required = true
+            outputLocation = file("$buildDir/reports/spotbugs/main.html")
+        }
+    }
+}
+
+// Checkstyle - Code style
+checkstyle {
+    toolVersion = '10.12.7'
+    configFile = file("config/checkstyle/checkstyle.xml")
+    ignoreFailures = true
+}
+
+tasks.withType(Checkstyle) {
+    reports {
+        xml.required = false
+        html.required = true
+    }
+}
+
+// Custom task for all quality checks
+task qualityCheck {
+    dependsOn 'spotlessCheck', 'pmdMain', 'pmdTest', 'spotbugsMain', 'checkstyleMain', 'test', 'jacocoTestCoverageVerification'
+    group = 'verification'
+    description = 'Run all quality checks: formatting, static analysis, and tests'
+}
+
+// Dependency updates plugin
+plugins.apply('com.github.ben-manes.versions')
+
+tasks.named("dependencyUpdates").configure {
+    checkForGradleUpdate = true
+    outputFormatter = "json"
+    outputDir = "build/dependencyUpdates"
+    reportfileName = "report"
+}

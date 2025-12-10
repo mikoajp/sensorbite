@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  sensorbite:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: sensorbite:latest
+    container_name: sensorbite-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=prod
+      - SENTINEL_HUB_CLIENT_ID=${SENTINEL_HUB_CLIENT_ID:-}
+      - SENTINEL_HUB_CLIENT_SECRET=${SENTINEL_HUB_CLIENT_SECRET:-}
+      - JAVA_OPTS=-XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+    networks:
+      - sensorbite-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    mem_limit: 512m
+    mem_reservation: 256m
+    cpus: 1.0
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: sensorbite-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - sensorbite-network
+    restart: unless-stopped
+    depends_on:
+      - sensorbite
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: sensorbite-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./docker/grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - sensorbite-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+networks:
+  sensorbite-network:
+    driver: bridge
+
+volumes:
+  prometheus-data:
+  grafana-data:
