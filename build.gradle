@@ -52,16 +52,16 @@ dependencies {
 
     // GIS Libraries
     implementation 'org.locationtech.jts:jts-core:1.19.0'
-    implementation('org.geotools:gt-geojson:29.2') {
+    implementation('org.geotools:gt-geojson:34.1') {
         exclude group: 'javax.media', module: 'jai_core'
         exclude group: 'javax.media', module: 'jai_codec'
         exclude group: 'javax.media', module: 'jai_imageio'
     }
-    implementation('org.geotools:gt-epsg-hsql:29.2') {
+    implementation('org.geotools:gt-epsg-hsql:34.1') {
         exclude group: 'javax.media', module: 'jai_core'
         exclude group: 'javax.media', module: 'jai_codec'
     }
-    implementation('org.geotools:gt-referencing:29.2') {
+    implementation('org.geotools:gt-referencing:34.1') {
         exclude group: 'javax.media', module: 'jai_core'
     }
 
