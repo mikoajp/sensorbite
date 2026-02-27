@@ -7,6 +7,7 @@ import com.sensorbite.service.BuildingService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 /** Tests for LoggingAspect to ensure AOP advice is applied correctly. */
@@ -28,6 +29,6 @@ class LoggingAspectTest {
   void serviceMethod_ShouldBeLogged() {
     // This will trigger the logging aspect
     // Verify no exceptions are thrown
-    buildingService.getAllBuildings();
+    buildingService.getAllBuildings(PageRequest.of(0, 10));
   }
 }

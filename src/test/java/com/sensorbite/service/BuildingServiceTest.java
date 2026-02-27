@@ -9,9 +9,9 @@ import com.sensorbite.dto.BuildingDTO;
 import com.sensorbite.entity.Building;
 import com.sensorbite.exception.ResourceAlreadyExistsException;
 import com.sensorbite.exception.ResourceNotFoundException;
+import com.sensorbite.mapper.BuildingMapper;
 import com.sensorbite.repository.BuildingRepository;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,11 +19,17 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class BuildingServiceTest {
 
   @Mock private BuildingRepository buildingRepository;
+
+  @Mock private BuildingMapper buildingMapper;
 
   @InjectMocks private BuildingService buildingService;
 
@@ -45,21 +51,25 @@ class BuildingServiceTest {
   @Test
   void getAllBuildings_ShouldReturnAllBuildings() {
     // Arrange
-    when(buildingRepository.findAll()).thenReturn(Arrays.asList(building));
+    Pageable pageable = PageRequest.of(0, 10);
+    Page<Building> buildingPage = new PageImpl<>(Arrays.asList(building));
+    when(buildingRepository.findAll(pageable)).thenReturn(buildingPage);
+    when(buildingMapper.toDTO(building)).thenReturn(buildingDTO);
 
     // Act
-    List<BuildingDTO> result = buildingService.getAllBuildings();
+    Page<BuildingDTO> result = buildingService.getAllBuildings(pageable);
 
     // Assert
-    assertEquals(1, result.size());
-    assertEquals("Test Building", result.get(0).getName());
-    verify(buildingRepository, times(1)).findAll();
+    assertEquals(1, result.getTotalElements());
+    assertEquals("Test Building", result.getContent().get(0).getName());
+    verify(buildingRepository, times(1)).findAll(pageable);
   }
 
   @Test
   void getBuildingById_WhenExists_ShouldReturnBuilding() {
     // Arrange
     when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+    when(buildingMapper.toDTO(building)).thenReturn(buildingDTO);
 
     // Act
     BuildingDTO result = buildingService.getBuildingById(1L);
@@ -88,6 +98,7 @@ class BuildingServiceTest {
     // Arrange
     when(buildingRepository.existsByName("Test Building")).thenReturn(false);
     when(buildingRepository.save(any(Building.class))).thenReturn(building);
+    when(buildingMapper.toDTO(building)).thenReturn(buildingDTO);
 
     // Act
     BuildingDTO result = buildingService.createBuilding(buildingDTO);
@@ -116,7 +127,7 @@ class BuildingServiceTest {
     // Arrange
     when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
     when(buildingRepository.existsByName("Updated Building")).thenReturn(false);
-    when(buildingRepository.save(any(Building.class))).thenReturn(building);
+    when(buildingMapper.toDTO(building)).thenReturn(buildingDTO);
 
     buildingDTO.setName("Updated Building");
 
@@ -125,26 +136,27 @@ class BuildingServiceTest {
 
     // Assert
     assertNotNull(result);
-    verify(buildingRepository, times(1)).save(any(Building.class));
+    // No longer expect save() to be called due to dirty checking
+    verify(buildingRepository, never()).save(any(Building.class));
   }
 
   @Test
   void deleteBuilding_WhenExists_ShouldDeleteBuilding() {
     // Arrange
-    when(buildingRepository.existsById(1L)).thenReturn(true);
-    doNothing().when(buildingRepository).deleteById(1L);
+    when(buildingRepository.findById(1L)).thenReturn(Optional.of(building));
+    doNothing().when(buildingRepository).delete(building);
 
     // Act
     buildingService.deleteBuilding(1L);
 
     // Assert
-    verify(buildingRepository, times(1)).deleteById(1L);
+    verify(buildingRepository, times(1)).delete(building);
   }
 
   @Test
   void deleteBuilding_WhenNotExists_ShouldThrowException() {
     // Arrange
-    when(buildingRepository.existsById(1L)).thenReturn(false);
+    when(buildingRepository.findById(1L)).thenReturn(Optional.empty());
 
     // Act & Assert
     assertThrows(

@@ -42,7 +42,8 @@ class EvacuationRoutingServiceTest {
   void setUp() {
     geometryFactory = new GeometryFactory();
     testGraph = createTestGraph();
-    EvacuationProperties properties = new EvacuationProperties(); // Use default properties for tests
+    EvacuationProperties properties =
+        new EvacuationProperties(); // Use default properties for tests
     routingService = new EvacuationRoutingService(roadNetworkService, properties);
 
     // Mock the cache entry to provide the test graph
@@ -83,8 +84,11 @@ class EvacuationRoutingServiceTest {
     Point end = geometryFactory.createPoint(new Coordinate(2, 0));
 
     Coordinate[] hazardCoords = {
-      new Coordinate(0.8, -0.2), new Coordinate(1.2, -0.2), new Coordinate(1.2, 0.2),
-      new Coordinate(0.8, 0.2), new Coordinate(0.8, -0.2)
+      new Coordinate(0.8, -0.2),
+      new Coordinate(1.2, -0.2),
+      new Coordinate(1.2, 0.2),
+      new Coordinate(0.8, 0.2),
+      new Coordinate(0.8, -0.2)
     };
     Polygon hazardPolygon = geometryFactory.createPolygon(hazardCoords);
     HazardZone hazard =
@@ -165,8 +169,11 @@ class EvacuationRoutingServiceTest {
     List<HazardZone> hazards = new ArrayList<>();
     for (int i = 0; i < 3; i++) {
       Coordinate[] coords = {
-        new Coordinate(3 + i, -1), new Coordinate(4 + i, -1), new Coordinate(4 + i, 1),
-        new Coordinate(3 + i, 1), new Coordinate(3 + i, -1)
+        new Coordinate(3 + i, -1),
+        new Coordinate(4 + i, -1),
+        new Coordinate(4 + i, 1),
+        new Coordinate(3 + i, 1),
+        new Coordinate(3 + i, -1)
       };
       hazards.add(
           HazardZone.builder()

@@ -11,10 +11,10 @@ import com.sensorbite.entity.Floor;
 import com.sensorbite.entity.Room;
 import com.sensorbite.entity.Sensor;
 import com.sensorbite.exception.ResourceNotFoundException;
+import com.sensorbite.mapper.SensorMapper;
 import com.sensorbite.repository.RoomRepository;
 import com.sensorbite.repository.SensorRepository;
 import java.util.Arrays;
-import java.util.List;
 import java.util.Optional;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -22,6 +22,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 
 @ExtendWith(MockitoExtension.class)
 class SensorServiceTest {
@@ -29,6 +33,8 @@ class SensorServiceTest {
   @Mock private SensorRepository sensorRepository;
 
   @Mock private RoomRepository roomRepository;
+
+  @Mock private SensorMapper sensorMapper;
 
   @InjectMocks private SensorService sensorService;
 
@@ -66,21 +72,25 @@ class SensorServiceTest {
   @Test
   void getAllSensors_ShouldReturnAllSensors() {
     // Arrange
-    when(sensorRepository.findAll()).thenReturn(Arrays.asList(sensor));
+    Pageable pageable = PageRequest.of(0, 10);
+    Page<Sensor> sensorPage = new PageImpl<>(Arrays.asList(sensor));
+    when(sensorRepository.findAll(pageable)).thenReturn(sensorPage);
+    when(sensorMapper.toDTO(sensor)).thenReturn(sensorDTO);
 
     // Act
-    List<SensorDTO> result = sensorService.getAllSensors();
+    Page<SensorDTO> result = sensorService.getAllSensors(pageable);
 
     // Assert
-    assertEquals(1, result.size());
-    assertEquals("TEMPERATURE", result.get(0).getType());
-    verify(sensorRepository, times(1)).findAll();
+    assertEquals(1, result.getTotalElements());
+    assertEquals("TEMPERATURE", result.getContent().get(0).getType());
+    verify(sensorRepository, times(1)).findAll(pageable);
   }
 
   @Test
   void getSensorById_WhenExists_ShouldReturnSensor() {
     // Arrange
     when(sensorRepository.findById(1L)).thenReturn(Optional.of(sensor));
+    when(sensorMapper.toDTO(sensor)).thenReturn(sensorDTO);
 
     // Act
     SensorDTO result = sensorService.getSensorById(1L);
@@ -107,11 +117,12 @@ class SensorServiceTest {
   @Test
   void getSensorsByRoomId_WhenRoomExists_ShouldReturnSensors() {
     // Arrange
-    when(roomRepository.existsById(1L)).thenReturn(true);
+    when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
     when(sensorRepository.findByRoomId(1L)).thenReturn(Arrays.asList(sensor));
+    when(sensorMapper.toDTO(sensor)).thenReturn(sensorDTO);
 
     // Act
-    List<SensorDTO> result = sensorService.getSensorsByRoomId(1L);
+    var result = sensorService.getSensorsByRoomId(1L);
 
     // Assert
     assertEquals(1, result.size());
@@ -121,7 +132,7 @@ class SensorServiceTest {
   @Test
   void getSensorsByRoomId_WhenRoomNotExists_ShouldThrowException() {
     // Arrange
-    when(roomRepository.existsById(1L)).thenReturn(false);
+    when(roomRepository.findById(1L)).thenReturn(Optional.empty());
 
     // Act & Assert
     assertThrows(
@@ -136,6 +147,7 @@ class SensorServiceTest {
     // Arrange
     when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
     when(sensorRepository.save(any(Sensor.class))).thenReturn(sensor);
+    when(sensorMapper.toDTO(sensor)).thenReturn(sensorDTO);
 
     // Act
     SensorDTO result = sensorService.createSensor(sensorDTO);
@@ -164,7 +176,7 @@ class SensorServiceTest {
     // Arrange
     when(sensorRepository.findById(1L)).thenReturn(Optional.of(sensor));
     when(roomRepository.findById(1L)).thenReturn(Optional.of(room));
-    when(sensorRepository.save(any(Sensor.class))).thenReturn(sensor);
+    when(sensorMapper.toDTO(sensor)).thenReturn(sensorDTO);
 
     sensorDTO.setType("HUMIDITY");
 
@@ -173,26 +185,27 @@ class SensorServiceTest {
 
     // Assert
     assertNotNull(result);
-    verify(sensorRepository, times(1)).save(any(Sensor.class));
+    // No longer expect save() to be called due to dirty checking
+    verify(sensorRepository, never()).save(any(Sensor.class));
   }
 
   @Test
   void deleteSensor_WhenExists_ShouldDeleteSensor() {
     // Arrange
-    when(sensorRepository.existsById(1L)).thenReturn(true);
-    doNothing().when(sensorRepository).deleteById(1L);
+    when(sensorRepository.findById(1L)).thenReturn(Optional.of(sensor));
+    doNothing().when(sensorRepository).delete(sensor);
 
     // Act
     sensorService.deleteSensor(1L);
 
     // Assert
-    verify(sensorRepository, times(1)).deleteById(1L);
+    verify(sensorRepository, times(1)).delete(sensor);
   }
 
   @Test
   void deleteSensor_WhenNotExists_ShouldThrowException() {
     // Arrange
-    when(sensorRepository.existsById(1L)).thenReturn(false);
+    when(sensorRepository.findById(1L)).thenReturn(Optional.empty());
 
     // Act & Assert
     assertThrows(

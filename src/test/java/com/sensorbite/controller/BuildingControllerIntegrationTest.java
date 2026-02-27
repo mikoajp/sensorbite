@@ -48,8 +48,8 @@ class BuildingControllerIntegrationTest {
     mockMvc
         .perform(get("/api/buildings"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$", hasSize(1)))
-        .andExpect(jsonPath("$[0].name", is("Test Building")));
+        .andExpect(jsonPath("$.content", hasSize(1)))
+        .andExpect(jsonPath("$.content[0].name", is("Test Building")));
   }
 
   @Test
