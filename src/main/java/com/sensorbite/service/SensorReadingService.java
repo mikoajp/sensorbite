@@ -5,12 +5,14 @@ import com.sensorbite.dto.SensorReadingDTO;
 import com.sensorbite.entity.Sensor;
 import com.sensorbite.entity.SensorReading;
 import com.sensorbite.exception.ResourceNotFoundException;
+import com.sensorbite.mapper.SensorReadingMapper;
 import com.sensorbite.repository.SensorReadingRepository;
 import com.sensorbite.repository.SensorRepository;
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,35 +22,36 @@ public class SensorReadingService {
 
   private final SensorReadingRepository sensorReadingRepository;
   private final SensorRepository sensorRepository;
+  private final SensorReadingMapper sensorReadingMapper;
 
   @Transactional(readOnly = true)
-  public List<SensorReadingDTO> getAllReadings() {
-    return sensorReadingRepository.findAll().stream()
-        .map(this::convertToDTO)
-        .collect(Collectors.toList());
+  public Page<SensorReadingDTO> getAllReadings(Pageable pageable) {
+    return sensorReadingRepository.findAll(pageable).map(sensorReadingMapper::toDTO);
   }
 
   @Transactional(readOnly = true)
   public List<SensorReadingDTO> getReadingsBySensorId(Long sensorId) {
-    if (!sensorRepository.existsById(sensorId)) {
-      throw new ResourceNotFoundException("Sensor not found with id: " + sensorId);
-    }
+    // Check if sensor exists by trying to fetch it (single query)
+    sensorRepository
+        .findById(sensorId)
+        .orElseThrow(() -> new ResourceNotFoundException("Sensor not found with id: " + sensorId));
     return sensorReadingRepository.findBySensorId(sensorId).stream()
-        .map(this::convertToDTO)
-        .collect(Collectors.toList());
+        .map(sensorReadingMapper::toDTO)
+        .toList();
   }
 
   @Transactional(readOnly = true)
   public List<SensorReadingDTO> getReadingsBySensorIdAndTimeRange(
       Long sensorId, LocalDateTime startTime, LocalDateTime endTime) {
-    if (!sensorRepository.existsById(sensorId)) {
-      throw new ResourceNotFoundException("Sensor not found with id: " + sensorId);
-    }
+    // Check if sensor exists by trying to fetch it (single query)
+    sensorRepository
+        .findById(sensorId)
+        .orElseThrow(() -> new ResourceNotFoundException("Sensor not found with id: " + sensorId));
     return sensorReadingRepository
         .findBySensorIdAndTimestampBetween(sensorId, startTime, endTime)
         .stream()
-        .map(this::convertToDTO)
-        .collect(Collectors.toList());
+        .map(sensorReadingMapper::toDTO)
+        .toList();
   }
 
   @Transactional(readOnly = true)
@@ -58,7 +61,7 @@ public class SensorReadingService {
             .findById(id)
             .orElseThrow(
                 () -> new ResourceNotFoundException("Sensor reading not found with id: " + id));
-    return convertToDTO(reading);
+    return sensorReadingMapper.toDTO(reading);
   }
 
   @Transactional
@@ -78,19 +81,16 @@ public class SensorReadingService {
     reading.setSensor(sensor);
 
     SensorReading savedReading = sensorReadingRepository.save(reading);
-    return convertToDTO(savedReading);
+    return sensorReadingMapper.toDTO(savedReading);
   }
 
   @Transactional
   public void deleteReading(Long id) {
-    if (!sensorReadingRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Sensor reading not found with id: " + id);
-    }
-    sensorReadingRepository.deleteById(id);
-  }
-
-  private SensorReadingDTO convertToDTO(SensorReading reading) {
-    return new SensorReadingDTO(
-        reading.getId(), reading.getValue(), reading.getTimestamp(), reading.getSensor().getId());
+    SensorReading reading =
+        sensorReadingRepository
+            .findById(id)
+            .orElseThrow(
+                () -> new ResourceNotFoundException("Sensor reading not found with id: " + id));
+    sensorReadingRepository.delete(reading);
   }
 }

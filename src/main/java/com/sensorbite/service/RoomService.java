@@ -6,11 +6,13 @@ import com.sensorbite.entity.Floor;
 import com.sensorbite.entity.Room;
 import com.sensorbite.exception.ResourceAlreadyExistsException;
 import com.sensorbite.exception.ResourceNotFoundException;
+import com.sensorbite.mapper.RoomMapper;
 import com.sensorbite.repository.FloorRepository;
 import com.sensorbite.repository.RoomRepository;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,20 +22,20 @@ public class RoomService {
 
   private final RoomRepository roomRepository;
   private final FloorRepository floorRepository;
+  private final RoomMapper roomMapper;
 
   @Transactional(readOnly = true)
-  public List<RoomDTO> getAllRooms() {
-    return roomRepository.findAll().stream().map(this::convertToDTO).collect(Collectors.toList());
+  public Page<RoomDTO> getAllRooms(Pageable pageable) {
+    return roomRepository.findAll(pageable).map(roomMapper::toDTO);
   }
 
   @Transactional(readOnly = true)
   public List<RoomDTO> getRoomsByFloorId(Long floorId) {
-    if (!floorRepository.existsById(floorId)) {
-      throw new ResourceNotFoundException("Floor not found with id: " + floorId);
-    }
-    return roomRepository.findByFloorId(floorId).stream()
-        .map(this::convertToDTO)
-        .collect(Collectors.toList());
+    // Check if floor exists by trying to fetch it (single query)
+    floorRepository
+        .findById(floorId)
+        .orElseThrow(() -> new ResourceNotFoundException("Floor not found with id: " + floorId));
+    return roomRepository.findByFloorId(floorId).stream().map(roomMapper::toDTO).toList();
   }
 
   @Transactional(readOnly = true)
@@ -42,7 +44,7 @@ public class RoomService {
         roomRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + id));
-    return convertToDTO(room);
+    return roomMapper.toDTO(room);
   }
 
   @Transactional
@@ -70,7 +72,7 @@ public class RoomService {
     room.setFloor(floor);
 
     Room savedRoom = roomRepository.save(room);
-    return convertToDTO(savedRoom);
+    return roomMapper.toDTO(savedRoom);
   }
 
   @Transactional
@@ -103,20 +105,16 @@ public class RoomService {
     room.setDescription(roomDTO.getDescription());
     room.setFloor(floor);
 
-    Room updatedRoom = roomRepository.save(room);
-    return convertToDTO(updatedRoom);
+    // No need to call save() - JPA dirty checking will update the entity
+    return roomMapper.toDTO(room);
   }
 
   @Transactional
   public void deleteRoom(Long id) {
-    if (!roomRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Room not found with id: " + id);
-    }
-    roomRepository.deleteById(id);
-  }
-
-  private RoomDTO convertToDTO(Room room) {
-    return new RoomDTO(
-        room.getId(), room.getRoomNumber(), room.getDescription(), room.getFloor().getId());
+    Room room =
+        roomRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + id));
+    roomRepository.delete(room);
   }
 }

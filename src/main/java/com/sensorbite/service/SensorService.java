@@ -5,11 +5,13 @@ import com.sensorbite.dto.SensorDTO;
 import com.sensorbite.entity.Room;
 import com.sensorbite.entity.Sensor;
 import com.sensorbite.exception.ResourceNotFoundException;
+import com.sensorbite.mapper.SensorMapper;
 import com.sensorbite.repository.RoomRepository;
 import com.sensorbite.repository.SensorRepository;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,20 +21,20 @@ public class SensorService {
 
   private final SensorRepository sensorRepository;
   private final RoomRepository roomRepository;
+  private final SensorMapper sensorMapper;
 
   @Transactional(readOnly = true)
-  public List<SensorDTO> getAllSensors() {
-    return sensorRepository.findAll().stream().map(this::convertToDTO).collect(Collectors.toList());
+  public Page<SensorDTO> getAllSensors(Pageable pageable) {
+    return sensorRepository.findAll(pageable).map(sensorMapper::toDTO);
   }
 
   @Transactional(readOnly = true)
   public List<SensorDTO> getSensorsByRoomId(Long roomId) {
-    if (!roomRepository.existsById(roomId)) {
-      throw new ResourceNotFoundException("Room not found with id: " + roomId);
-    }
-    return sensorRepository.findByRoomId(roomId).stream()
-        .map(this::convertToDTO)
-        .collect(Collectors.toList());
+    // Check if room exists by trying to fetch it (single query)
+    roomRepository
+        .findById(roomId)
+        .orElseThrow(() -> new ResourceNotFoundException("Room not found with id: " + roomId));
+    return sensorRepository.findByRoomId(roomId).stream().map(sensorMapper::toDTO).toList();
   }
 
   @Transactional(readOnly = true)
@@ -41,7 +43,7 @@ public class SensorService {
         sensorRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Sensor not found with id: " + id));
-    return convertToDTO(sensor);
+    return sensorMapper.toDTO(sensor);
   }
 
   @Transactional
@@ -60,7 +62,7 @@ public class SensorService {
     sensor.setRoom(room);
 
     Sensor savedSensor = sensorRepository.save(sensor);
-    return convertToDTO(savedSensor);
+    return sensorMapper.toDTO(savedSensor);
   }
 
   @Transactional
@@ -82,20 +84,16 @@ public class SensorService {
     sensor.setDescription(sensorDTO.getDescription());
     sensor.setRoom(room);
 
-    Sensor updatedSensor = sensorRepository.save(sensor);
-    return convertToDTO(updatedSensor);
+    // No need to call save() - JPA dirty checking will update the entity
+    return sensorMapper.toDTO(sensor);
   }
 
   @Transactional
   public void deleteSensor(Long id) {
-    if (!sensorRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Sensor not found with id: " + id);
-    }
-    sensorRepository.deleteById(id);
-  }
-
-  private SensorDTO convertToDTO(Sensor sensor) {
-    return new SensorDTO(
-        sensor.getId(), sensor.getType(), sensor.getDescription(), sensor.getRoom().getId());
+    Sensor sensor =
+        sensorRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Sensor not found with id: " + id));
+    sensorRepository.delete(sensor);
   }
 }

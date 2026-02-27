@@ -6,11 +6,13 @@ import com.sensorbite.entity.Building;
 import com.sensorbite.entity.Floor;
 import com.sensorbite.exception.ResourceAlreadyExistsException;
 import com.sensorbite.exception.ResourceNotFoundException;
+import com.sensorbite.mapper.FloorMapper;
 import com.sensorbite.repository.BuildingRepository;
 import com.sensorbite.repository.FloorRepository;
 import java.util.List;
-import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,20 +22,21 @@ public class FloorService {
 
   private final FloorRepository floorRepository;
   private final BuildingRepository buildingRepository;
+  private final FloorMapper floorMapper;
 
   @Transactional(readOnly = true)
-  public List<FloorDTO> getAllFloors() {
-    return floorRepository.findAll().stream().map(this::convertToDTO).collect(Collectors.toList());
+  public Page<FloorDTO> getAllFloors(Pageable pageable) {
+    return floorRepository.findAll(pageable).map(floorMapper::toDTO);
   }
 
   @Transactional(readOnly = true)
   public List<FloorDTO> getFloorsByBuildingId(Long buildingId) {
-    if (!buildingRepository.existsById(buildingId)) {
-      throw new ResourceNotFoundException("Building not found with id: " + buildingId);
-    }
-    return floorRepository.findByBuildingId(buildingId).stream()
-        .map(this::convertToDTO)
-        .collect(Collectors.toList());
+    // Check if building exists by trying to fetch it (single query)
+    buildingRepository
+        .findById(buildingId)
+        .orElseThrow(
+            () -> new ResourceNotFoundException("Building not found with id: " + buildingId));
+    return floorRepository.findByBuildingId(buildingId).stream().map(floorMapper::toDTO).toList();
   }
 
   @Transactional(readOnly = true)
@@ -42,7 +45,7 @@ public class FloorService {
         floorRepository
             .findById(id)
             .orElseThrow(() -> new ResourceNotFoundException("Floor not found with id: " + id));
-    return convertToDTO(floor);
+    return floorMapper.toDTO(floor);
   }
 
   @Transactional
@@ -68,7 +71,7 @@ public class FloorService {
     floor.setBuilding(building);
 
     Floor savedFloor = floorRepository.save(floor);
-    return convertToDTO(savedFloor);
+    return floorMapper.toDTO(savedFloor);
   }
 
   @Transactional
@@ -100,19 +103,16 @@ public class FloorService {
     floor.setLevel(floorDTO.getLevel());
     floor.setBuilding(building);
 
-    Floor updatedFloor = floorRepository.save(floor);
-    return convertToDTO(updatedFloor);
+    // No need to call save() - JPA dirty checking will update the entity
+    return floorMapper.toDTO(floor);
   }
 
   @Transactional
   public void deleteFloor(Long id) {
-    if (!floorRepository.existsById(id)) {
-      throw new ResourceNotFoundException("Floor not found with id: " + id);
-    }
-    floorRepository.deleteById(id);
-  }
-
-  private FloorDTO convertToDTO(Floor floor) {
-    return new FloorDTO(floor.getId(), floor.getLevel(), floor.getBuilding().getId());
+    Floor floor =
+        floorRepository
+            .findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Floor not found with id: " + id));
+    floorRepository.delete(floor);
   }
 }
