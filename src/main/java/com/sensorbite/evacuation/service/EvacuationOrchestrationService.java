@@ -43,7 +43,8 @@ public class EvacuationOrchestrationService {
     // 2. Create geometry points
     Point start =
         geometryFactory.createPoint(new Coordinate(request.getStartLon(), request.getStartLat()));
-    Point end = geometryFactory.createPoint(new Coordinate(request.getEndLon(), request.getEndLat()));
+    Point end =
+        geometryFactory.createPoint(new Coordinate(request.getEndLon(), request.getEndLat()));
 
     // 3. Get hazard zones
     List<HazardZone> hazardZones = getHazardZones(request);

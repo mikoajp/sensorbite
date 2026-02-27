@@ -213,9 +213,7 @@ public class EvacuationRoutingService {
     // Calculate estimated time
     long estimatedTimeMinutes =
         (long)
-            ((totalDistance / 1000.0)
-                / properties.getRouteCalculation().getWalkingSpeedKmh()
-                * 60);
+            ((totalDistance / 1000.0) / properties.getRouteCalculation().getWalkingSpeedKmh() * 60);
 
     // Count avoided hazards
     int avoidedZones = countAvoidedHazards(routeGeometry, hazardZones);

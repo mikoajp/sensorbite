@@ -5,7 +5,6 @@ import com.sensorbite.evacuation.domain.RoadNode;
 import com.sensorbite.evacuation.exception.RoadNetworkLoadException;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.Map;
 import lombok.Value;
@@ -26,8 +25,8 @@ import org.springframework.stereotype.Service;
 
 /**
  * Service responsible for loading and managing road network data from GeoJSON files. Converts
- * geographic data into a graph structure suitable for routing algorithms. This service is stateless,
- * with caching at the service method level.
+ * geographic data into a graph structure suitable for routing algorithms. This service is
+ * stateless, with caching at the service method level.
  */
 @Service
 @Slf4j
@@ -108,7 +107,8 @@ public class RoadNetworkService {
       throws RoadNetworkLoadException {
 
     long startTime = System.currentTimeMillis();
-    Graph<RoadNode, DefaultWeightedEdge> graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+    Graph<RoadNode, DefaultWeightedEdge> graph =
+        new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
     Map<String, RoadNode> nodeCache = new HashMap<>();
 
     try {
@@ -257,7 +257,8 @@ public class RoadNetworkService {
 
   private Graph<RoadNode, DefaultWeightedEdge> createSampleNetwork() {
     log.info("Creating sample road network");
-    Graph<RoadNode, DefaultWeightedEdge> graph = new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
+    Graph<RoadNode, DefaultWeightedEdge> graph =
+        new SimpleWeightedGraph<>(DefaultWeightedEdge.class);
     GeometryFactory factory = new GeometryFactory();
     RoadNode[][] nodes = new RoadNode[5][5];
 
