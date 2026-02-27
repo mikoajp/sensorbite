@@ -4,8 +4,6 @@ package com.sensorbite.evacuation.controller;
 import com.sensorbite.evacuation.domain.RouteResult;
 import com.sensorbite.evacuation.dto.RouteRequest;
 import com.sensorbite.evacuation.dto.RouteResponse;
-import com.sensorbite.evacuation.exception.InvalidCoordinatesException;
-import com.sensorbite.evacuation.exception.NoRouteFoundException;
 import com.sensorbite.evacuation.mapper.RouteMapper;
 import com.sensorbite.evacuation.service.EvacuationOrchestrationService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -48,29 +46,26 @@ public class EvacuationController {
         request.getEndLat(),
         request.getEndLon());
 
-    try {
-      // Delegate all logic to the orchestration service
-      RouteResult result = orchestrationService.calculateEvacuationRoute(request);
+    // Delegate all logic to the orchestration service
+    RouteResult result = orchestrationService.calculateEvacuationRoute(request);
 
-      // Convert the domain result to a DTO response
-      RouteResponse response = routeMapper.toResponse(result);
+    // Convert the domain result to a DTO response
+    RouteResponse response = routeMapper.toResponse(result);
 
+    // Safe access with null check
+    if (response != null
+        && response.getFeatures() != null
+        && !response.getFeatures().isEmpty()
+        && response.getFeatures().get(0).getProperties() != null) {
       log.info(
           "Route calculated successfully: {} km, {} minutes",
           response.getFeatures().get(0).getProperties().getDistanceKm(),
           response.getFeatures().get(0).getProperties().getEstimatedTimeMinutes());
-
-      return ResponseEntity.ok(response);
-
-    } catch (InvalidCoordinatesException | NoRouteFoundException e) {
-      log.warn("Failed to calculate route: {}", e.getMessage());
-      throw e; // Re-throw to be caught by @ExceptionHandler
-    } catch (Exception e) {
-      log.error("An unexpected error occurred while calculating the route", e);
-      // To avoid exposing internal details, we throw a generic runtime exception.
-      // GlobalExceptionHandler will handle this and return a 500 error.
-      throw new RuntimeException("An unexpected error occurred while processing your request.", e);
+    } else {
+      log.warn("Route calculated but response structure is incomplete");
     }
+
+    return ResponseEntity.ok(response);
   }
 
   /** Health check endpoint for evacuation service. */
@@ -85,17 +80,5 @@ public class EvacuationController {
       return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
           .body("Evacuation service is not available");
     }
-  }
-
-  /** Exception handler for invalid coordinates. */
-  @ExceptionHandler(InvalidCoordinatesException.class)
-  public ResponseEntity<String> handleInvalidCoordinates(InvalidCoordinatesException e) {
-    return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(e.getMessage());
-  }
-
-  /** Exception handler for no route found. */
-  @ExceptionHandler(NoRouteFoundException.class)
-  public ResponseEntity<String> handleNoRouteFound(NoRouteFoundException e) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(e.getMessage());
   }
 }
