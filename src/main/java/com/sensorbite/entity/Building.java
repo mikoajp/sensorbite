@@ -21,7 +21,7 @@ public class Building {
   private Long id;
 
   @NotBlank(message = "Building name is required")
-  @Column(nullable = false)
+  @Column(nullable = false, unique = true)
   private String name;
 
   @Column(length = 500)
