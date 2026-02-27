@@ -68,17 +68,17 @@ public class EvacuationController {
     return ResponseEntity.ok(response);
   }
 
-  /** Health check endpoint for evacuation service. */
+  /** 
+   * Health check endpoint for evacuation service. 
+   * Note: Consider using Spring Boot Actuator /actuator/health for production health checks.
+   * This endpoint provides a basic operational status.
+   */
   @GetMapping("/health")
   @Operation(summary = "Health check", description = "Check if evacuation service is operational")
   public ResponseEntity<String> health() {
-    // Basic check to see if the main service bean is available
-    boolean isOperational = orchestrationService != null;
-    if (isOperational) {
-      return ResponseEntity.ok("Evacuation service is operational");
-    } else {
-      return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
-          .body("Evacuation service is not available");
-    }
+    // Return operational status
+    // The fact that this endpoint is reachable confirms the service is running
+    // For more sophisticated health checks, use Spring Boot Actuator
+    return ResponseEntity.ok("Evacuation service is operational");
   }
 }
