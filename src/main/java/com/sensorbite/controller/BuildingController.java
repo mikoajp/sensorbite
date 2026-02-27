@@ -6,8 +6,11 @@ import com.sensorbite.service.BuildingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +25,9 @@ public class BuildingController {
 
   @GetMapping
   @Operation(summary = "Get all buildings")
-  public ResponseEntity<List<BuildingDTO>> getAllBuildings() {
-    return ResponseEntity.ok(buildingService.getAllBuildings());
+  public ResponseEntity<Page<BuildingDTO>> getAllBuildings(
+      @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
+    return ResponseEntity.ok(buildingService.getAllBuildings(pageable));
   }
 
   @GetMapping("/{id}")

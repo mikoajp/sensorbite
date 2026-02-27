@@ -9,6 +9,10 @@ import jakarta.validation.Valid;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -24,8 +28,10 @@ public class SensorReadingController {
 
   @GetMapping
   @Operation(summary = "Get all sensor readings")
-  public ResponseEntity<List<SensorReadingDTO>> getAllReadings() {
-    return ResponseEntity.ok(sensorReadingService.getAllReadings());
+  public ResponseEntity<Page<SensorReadingDTO>> getAllReadings(
+      @PageableDefault(size = 20, sort = "timestamp", direction = Sort.Direction.DESC)
+          Pageable pageable) {
+    return ResponseEntity.ok(sensorReadingService.getAllReadings(pageable));
   }
 
   @GetMapping("/{id}")

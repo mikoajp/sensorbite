@@ -8,6 +8,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -22,8 +26,9 @@ public class SensorController {
 
   @GetMapping
   @Operation(summary = "Get all sensors")
-  public ResponseEntity<List<SensorDTO>> getAllSensors() {
-    return ResponseEntity.ok(sensorService.getAllSensors());
+  public ResponseEntity<Page<SensorDTO>> getAllSensors(
+      @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.ASC) Pageable pageable) {
+    return ResponseEntity.ok(sensorService.getAllSensors(pageable));
   }
 
   @GetMapping("/{id}")
