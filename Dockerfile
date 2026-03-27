@@ -19,7 +19,7 @@ COPY src ./src
 RUN gradle clean build --no-daemon -x test
 
 # Stage 2: Runtime
-FROM eclipse-temurin:17-jre-alpine
+FROM eclipse-temurin:25-jre-alpine
 
 LABEL maintainer="sensorbite@example.com"
 LABEL description="Sensorbite - Evacuation Route Planning System"
